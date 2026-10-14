@@ -1344,14 +1344,14 @@ fn apply_run_url_overrides(
         replace_upstream_base_url(
             &mut config.openai_base_url,
             &mut config.openai_auth_header,
-            value.clone(),
+            validate_upstream_base_url("--openai-base-url", value.clone())?,
         );
     }
     if let Some(value) = &command.anthropic_base_url {
         replace_upstream_base_url(
             &mut config.anthropic_base_url,
             &mut config.anthropic_auth_header,
-            value.clone(),
+            validate_upstream_base_url("--anthropic-base-url", value.clone())?,
         );
     }
     if let Some(value) = &command.chatgpt_codex_base_url {
@@ -1388,14 +1388,14 @@ fn apply_server_overrides(
         replace_upstream_base_url(
             &mut config.openai_base_url,
             &mut config.openai_auth_header,
-            value.clone(),
+            validate_upstream_base_url("--openai-base-url", value.clone())?,
         );
     }
     if let Some(value) = &args.anthropic_base_url {
         replace_upstream_base_url(
             &mut config.anthropic_base_url,
             &mut config.anthropic_auth_header,
-            value.clone(),
+            validate_upstream_base_url("--anthropic-base-url", value.clone())?,
         );
     }
     if let Some(value) = &args.chatgpt_codex_base_url {
@@ -1684,7 +1684,7 @@ fn apply_file_upstream_config(
         gateway.response_timeout_secs = value;
     }
     if let Some(value) = openai_base_url {
-        gateway.openai_base_url = value;
+        gateway.openai_base_url = validate_upstream_base_url("upstream.openai_base_url", value)?;
         if openai_auth_header.is_none() {
             gateway.openai_auth_header = None;
         }
@@ -1694,7 +1694,8 @@ fn apply_file_upstream_config(
             Some(validate_auth_header("upstream.openai_auth_header", value)?);
     }
     if let Some(value) = anthropic_base_url {
-        gateway.anthropic_base_url = value;
+        gateway.anthropic_base_url =
+            validate_upstream_base_url("upstream.anthropic_base_url", value)?;
         if anthropic_auth_header.is_none() {
             gateway.anthropic_auth_header = None;
         }
@@ -1992,7 +1993,7 @@ fn apply_env_config(config: &mut GatewayConfig) -> Result<(), CliError> {
         replace_upstream_base_url(
             &mut config.openai_base_url,
             &mut config.openai_auth_header,
-            value,
+            validate_upstream_base_url("NEMO_RELAY_OPENAI_BASE_URL", value)?,
         );
     }
     if let Some(value) = openai_auth_header {
@@ -2006,7 +2007,7 @@ fn apply_env_config(config: &mut GatewayConfig) -> Result<(), CliError> {
         replace_upstream_base_url(
             &mut config.anthropic_base_url,
             &mut config.anthropic_auth_header,
-            value,
+            validate_upstream_base_url("NEMO_RELAY_ANTHROPIC_BASE_URL", value)?,
         );
     }
     if let Some(value) = anthropic_auth_header {
@@ -2062,9 +2063,20 @@ fn replace_upstream_base_url(
     *base_url = replacement;
 }
 
-// ChatGPT credentials may only travel over TLS, except to a loopback proxy. Reject URL
-// components that would change the meaning of the request path appended by the gateway.
+// Preserve Codex's normalized URL serialization, including a bare host's trailing slash.
 fn validate_chatgpt_codex_base_url(name: &str, value: String) -> Result<String, CliError> {
+    Ok(parse_upstream_base_url(name, &value)?.to_string())
+}
+
+// Preserve the trimmed spelling used to compare OpenAI and Anthropic credential destinations.
+fn validate_upstream_base_url(name: &str, value: String) -> Result<String, CliError> {
+    parse_upstream_base_url(name, &value)?;
+    Ok(value.trim().to_string())
+}
+
+// Provider credentials may only travel over TLS, except to a loopback proxy. Reject URL
+// components that would change the meaning of the request path appended by the gateway.
+fn parse_upstream_base_url(name: &str, value: &str) -> Result<reqwest::Url, CliError> {
     let value = value.trim();
     if value.is_empty() {
         return Err(CliError::Config(format!("{name} must not be empty")));
@@ -2093,7 +2105,7 @@ fn validate_chatgpt_codex_base_url(name: &str, value: String) -> Result<String, 
             "{name} must not include user information, a query, or a fragment"
         )));
     }
-    Ok(url.to_string())
+    Ok(url)
 }
 
 fn validate_auth_header(name: &str, value: String) -> Result<String, CliError> {

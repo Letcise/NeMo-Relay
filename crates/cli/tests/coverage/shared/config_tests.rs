@@ -624,13 +624,13 @@ fn test_hook_skips_implicit_config_but_retains_explicit_config_and_environment()
     std::fs::create_dir_all(explicit_config.parent().unwrap()).unwrap();
     std::fs::write(
         &user_config,
-        "[upstream]\nopenai_base_url = 'http://user'\n",
+        "[upstream]\nopenai_base_url = 'https://user'\n",
     )
     .unwrap();
     std::fs::write(&user_plugins, "not valid TOML = [").unwrap();
     std::fs::write(
         &explicit_config,
-        "[upstream]\nopenai_base_url = 'http://explicit'\n",
+        "[upstream]\nopenai_base_url = 'https://explicit'\n",
     )
     .unwrap();
     let explicit_plugin_dir = explicit_config.parent().unwrap().join("plugins/acme");
@@ -649,7 +649,7 @@ manifest = "plugins/acme/relay-plugin.toml"
     .unwrap();
 
     let scope = PluginConfigDiscoveryScope::enter(temp.path(), &xdg);
-    scope.set_base_urls("http://environment", "http://environment-anthropic");
+    scope.set_base_urls("https://environment", "https://environment-anthropic");
     scope.skip_implicit_config();
 
     assert!(config_paths(None).is_empty());
@@ -665,9 +665,9 @@ manifest = "plugins/acme/relay-plugin.toml"
     );
 
     let implicit = load_shared_config(None, None).unwrap();
-    assert_eq!(implicit.gateway.openai_base_url, "http://environment");
+    assert_eq!(implicit.gateway.openai_base_url, "https://environment");
     let explicit = load_shared_config(Some(&explicit_config), None).unwrap();
-    assert_eq!(explicit.gateway.openai_base_url, "http://environment");
+    assert_eq!(explicit.gateway.openai_base_url, "https://environment");
     let explicit_plugin_config = load_shared_config(None, Some(&explicit_plugins)).unwrap();
     assert_eq!(explicit_plugin_config.dynamic_plugins.len(), 1);
     assert_eq!(
@@ -680,9 +680,9 @@ fn config() -> GatewayConfig {
     GatewayConfig {
         response_timeout_secs: 0,
         bind: "127.0.0.1:0".parse().unwrap(),
-        openai_base_url: "http://openai".into(),
+        openai_base_url: "https://openai".into(),
         openai_auth_header: None,
-        anthropic_base_url: "http://anthropic".into(),
+        anthropic_base_url: "https://anthropic".into(),
         anthropic_auth_header: None,
         chatgpt_codex_base_url: None,
         metadata: None,
@@ -1003,10 +1003,10 @@ fn explicit_toml_config_maps_supported_sections() {
         &path,
         r#"
 [upstream]
-openai_base_url = "http://openai"
+openai_base_url = "https://openai"
 response_timeout_secs = 120
 openai_auth_header = "Bearer openai-file"
-anthropic_base_url = "http://anthropic"
+anthropic_base_url = "https://anthropic"
 anthropic_auth_header = "Basic anthropic-file"
 
 [gateway]
@@ -1038,7 +1038,7 @@ command = "codex --approval-mode never"
     let resolved = resolve_run_config(&command, None).unwrap();
 
     assert_eq!(resolved.gateway.bind.to_string(), "127.0.0.1:0");
-    assert_eq!(resolved.gateway.openai_base_url, "http://openai");
+    assert_eq!(resolved.gateway.openai_base_url, "https://openai");
     assert_eq!(
         resolved.gateway.response_timeout(),
         Some(Duration::from_secs(120))
@@ -1047,7 +1047,7 @@ command = "codex --approval-mode never"
         resolved.gateway.openai_auth_header.as_deref(),
         Some("Bearer openai-file")
     );
-    assert_eq!(resolved.gateway.anthropic_base_url, "http://anthropic");
+    assert_eq!(resolved.gateway.anthropic_base_url, "https://anthropic");
     assert_eq!(
         resolved.gateway.anthropic_auth_header.as_deref(),
         Some("Basic anthropic-file")
@@ -1124,8 +1124,8 @@ fn ignored_project_endpoints_do_not_clear_user_provider_auth_headers() {
         project.join(".nemo-relay/config.toml"),
         r#"
 [upstream]
-openai_base_url = "http://project-openai"
-anthropic_base_url = "http://project-anthropic"
+openai_base_url = "https://project-openai"
+anthropic_base_url = "https://project-anthropic"
 "#,
     )
     .unwrap();
@@ -1133,9 +1133,9 @@ anthropic_base_url = "http://project-anthropic"
         xdg.join("nemo-relay/config.toml"),
         r#"
 [upstream]
-openai_base_url = "http://user-openai"
+openai_base_url = "https://user-openai"
 openai_auth_header = "Bearer user-openai"
-anthropic_base_url = "http://user-anthropic"
+anthropic_base_url = "https://user-anthropic"
 anthropic_auth_header = "Basic user-anthropic"
 "#,
     )
@@ -1144,12 +1144,15 @@ anthropic_auth_header = "Basic user-anthropic"
 
     let resolved = resolve_server_config(&GatewayOverrides::default()).unwrap();
 
-    assert_eq!(resolved.gateway.openai_base_url, "http://user-openai");
+    assert_eq!(resolved.gateway.openai_base_url, "https://user-openai");
     assert_eq!(
         resolved.gateway.openai_auth_header.as_deref(),
         Some("Bearer user-openai")
     );
-    assert_eq!(resolved.gateway.anthropic_base_url, "http://user-anthropic");
+    assert_eq!(
+        resolved.gateway.anthropic_base_url,
+        "https://user-anthropic"
+    );
     assert_eq!(
         resolved.gateway.anthropic_auth_header.as_deref(),
         Some("Basic user-anthropic")
@@ -1172,7 +1175,10 @@ anthropic_auth_header = "Basic file-anthropic"
 "#,
     )
     .unwrap();
-    scope.set_base_urls("http://environment-openai", "http://environment-anthropic");
+    scope.set_base_urls(
+        "https://environment-openai",
+        "https://environment-anthropic",
+    );
 
     let resolved = resolve_server_config(&GatewayOverrides {
         config: Some(path),
@@ -1182,12 +1188,12 @@ anthropic_auth_header = "Basic file-anthropic"
 
     assert_eq!(
         resolved.gateway.openai_base_url,
-        "http://environment-openai"
+        "https://environment-openai"
     );
     assert!(resolved.gateway.openai_auth_header.is_none());
     assert_eq!(
         resolved.gateway.anthropic_base_url,
-        "http://environment-anthropic"
+        "https://environment-anthropic"
     );
     assert!(resolved.gateway.anthropic_auth_header.is_none());
 }
@@ -1203,14 +1209,14 @@ fn matching_endpoint_environment_overrides_preserve_file_provider_auth_headers()
         &path,
         r#"
 [upstream]
-openai_base_url = "http://same-openai"
+openai_base_url = "https://same-openai"
 openai_auth_header = "Bearer file-openai"
-anthropic_base_url = "http://same-anthropic"
+anthropic_base_url = "https://same-anthropic"
 anthropic_auth_header = "Basic file-anthropic"
 "#,
     )
     .unwrap();
-    scope.set_base_urls("http://same-openai", "http://same-anthropic");
+    scope.set_base_urls("https://same-openai", "https://same-anthropic");
 
     let resolved = resolve_server_config(&GatewayOverrides {
         config: Some(path),
@@ -1476,7 +1482,7 @@ fn explicit_plugins_toml_maps_root_plugin_config() {
         &config_path,
         r#"
 [upstream]
-openai_base_url = "http://openai"
+openai_base_url = "https://openai"
 "#,
     )
     .unwrap();
@@ -2588,7 +2594,7 @@ fn cli_run_overrides_config_values() {
         &path,
         r#"
 [upstream]
-openai_base_url = "http://file-openai"
+openai_base_url = "https://file-openai"
 openai_auth_header = "Bearer file-openai"
 "#,
     )
@@ -2597,7 +2603,7 @@ openai_auth_header = "Bearer file-openai"
         chatgpt_codex_base_url: None,
         agent: Some(CodingAgent::Codex),
         config: Some(path),
-        openai_base_url: Some("http://cli-openai".into()),
+        openai_base_url: Some("https://cli-openai".into()),
         anthropic_base_url: None,
         session_metadata: Some(r#"{"team":"cli"}"#.into()),
         plugin_config_path: None,
@@ -2608,7 +2614,7 @@ openai_auth_header = "Bearer file-openai"
 
     let resolved = resolve_run_config(&command, None).unwrap();
 
-    assert_eq!(resolved.gateway.openai_base_url, "http://cli-openai");
+    assert_eq!(resolved.gateway.openai_base_url, "https://cli-openai");
     assert!(resolved.gateway.openai_auth_header.is_none());
     assert_eq!(resolved.gateway.metadata, Some(json!({ "team": "cli" })));
 }
@@ -2622,14 +2628,14 @@ fn run_inherits_top_level_server_flags_when_subcommand_flags_are_absent() {
         &path,
         r#"
 [upstream]
-openai_base_url = "http://file-openai"
+openai_base_url = "https://file-openai"
 openai_auth_header = "Bearer file-openai"
 "#,
     )
     .unwrap();
     let server = GatewayOverrides {
         config: Some(path),
-        openai_base_url: Some("http://top-level-openai".into()),
+        openai_base_url: Some("https://top-level-openai".into()),
         ..GatewayOverrides::default()
     };
     let command = RunOverrides {
@@ -2647,7 +2653,7 @@ openai_auth_header = "Bearer file-openai"
 
     let resolved = resolve_run_config(&command, Some(&server)).unwrap();
 
-    assert_eq!(resolved.gateway.openai_base_url, "http://top-level-openai");
+    assert_eq!(resolved.gateway.openai_base_url, "https://top-level-openai");
     assert!(resolved.gateway.openai_auth_header.is_none());
 }
 
@@ -2662,9 +2668,9 @@ fn server_resolution_applies_all_server_overrides() {
         &config_path,
         r#"
 [upstream]
-openai_base_url = "http://file-openai"
+openai_base_url = "https://file-openai"
 openai_auth_header = "Bearer file-openai"
-anthropic_base_url = "http://file-anthropic"
+anthropic_base_url = "https://file-anthropic"
 anthropic_auth_header = "Basic file-anthropic"
 "#,
     )
@@ -2672,8 +2678,8 @@ anthropic_auth_header = "Basic file-anthropic"
     let args = GatewayOverrides {
         config: Some(config_path),
         bind: Some("127.0.0.1:0".parse().unwrap()),
-        openai_base_url: Some("http://cli-openai".into()),
-        anthropic_base_url: Some("http://cli-anthropic".into()),
+        openai_base_url: Some("https://cli-openai".into()),
+        anthropic_base_url: Some("https://cli-anthropic".into()),
         chatgpt_codex_base_url: None,
         plugin_config_path: None,
         ready_file: None,
@@ -2684,9 +2690,9 @@ anthropic_auth_header = "Basic file-anthropic"
     let resolved = resolve_server_config(&args).unwrap();
 
     assert_eq!(resolved.gateway.bind.to_string(), "127.0.0.1:0");
-    assert_eq!(resolved.gateway.openai_base_url, "http://cli-openai");
+    assert_eq!(resolved.gateway.openai_base_url, "https://cli-openai");
     assert!(resolved.gateway.openai_auth_header.is_none());
-    assert_eq!(resolved.gateway.anthropic_base_url, "http://cli-anthropic");
+    assert_eq!(resolved.gateway.anthropic_base_url, "https://cli-anthropic");
     assert!(resolved.gateway.anthropic_auth_header.is_none());
     assert_eq!(resolved.gateway.max_hook_payload_bytes, 222);
     assert_eq!(resolved.gateway.max_passthrough_body_bytes, 333);
@@ -3173,7 +3179,7 @@ fn persistent_server_resolution_excludes_project_config_and_fingerprints_credent
     std::fs::create_dir_all(&xdg).unwrap();
     std::fs::write(
         project.join(".nemo-relay/config.toml"),
-        "[upstream]\nopenai_base_url = \"http://project-only\"\n",
+        "[upstream]\nopenai_base_url = \"https://project-only\"\n",
     )
     .unwrap();
     let _scope = PluginConfigDiscoveryScope::enter(&project, &xdg);
@@ -3184,7 +3190,7 @@ fn persistent_server_resolution_excludes_project_config_and_fingerprints_credent
 
     unsafe { std::env::set_var("OPENAI_API_KEY", "credential-one") };
     let first = resolve_persistent_server_config(&args).unwrap();
-    assert_ne!(first.gateway.openai_base_url, "http://project-only");
+    assert_ne!(first.gateway.openai_base_url, "https://project-only");
     assert!(
         first
             .bootstrap_fingerprint
@@ -4087,8 +4093,8 @@ fn run_resolution_applies_all_run_overrides() {
         chatgpt_codex_base_url: None,
         agent: Some(CodingAgent::Codex),
         config: Some(config_path),
-        openai_base_url: Some("http://run-openai".into()),
-        anthropic_base_url: Some("http://run-anthropic".into()),
+        openai_base_url: Some("https://run-openai".into()),
+        anthropic_base_url: Some("https://run-anthropic".into()),
         session_metadata: Some(r#"{"team":"run"}"#.into()),
         plugin_config_path: None,
         dry_run: false,
@@ -4098,8 +4104,8 @@ fn run_resolution_applies_all_run_overrides() {
 
     let resolved = resolve_run_config(&command, None).unwrap();
 
-    assert_eq!(resolved.gateway.openai_base_url, "http://run-openai");
-    assert_eq!(resolved.gateway.anthropic_base_url, "http://run-anthropic");
+    assert_eq!(resolved.gateway.openai_base_url, "https://run-openai");
+    assert_eq!(resolved.gateway.anthropic_base_url, "https://run-anthropic");
     assert_eq!(resolved.gateway.metadata, Some(json!({ "team": "run" })));
 }
 
@@ -4221,8 +4227,8 @@ fn malformed_shared_config_reports_context() {
 fn recursive_toml_merge_replaces_scalars_and_preserves_tables() {
     let mut left: toml::Value = r#"
 [upstream]
-openai_base_url = "http://old"
-anthropic_base_url = "http://anthropic"
+openai_base_url = "https://old"
+anthropic_base_url = "https://anthropic"
 
 [runtime.policy]
 version = 1
@@ -4233,7 +4239,7 @@ policy = { unknown_component = "warn", unknown_field = "warn" }
     .unwrap();
     let right: toml::Value = r#"
 [upstream]
-openai_base_url = "http://new"
+openai_base_url = "https://new"
 
 [runtime.policy.policy]
 unknown_component = "error"
@@ -4246,11 +4252,11 @@ unknown_component = "error"
 
     assert_eq!(
         left["upstream"]["openai_base_url"].as_str(),
-        Some("http://new")
+        Some("https://new")
     );
     assert_eq!(
         left["upstream"]["anthropic_base_url"].as_str(),
-        Some("http://anthropic")
+        Some("https://anthropic")
     );
     assert_eq!(
         left["runtime"]["policy"]["policy"]["unknown_component"].as_str(),
@@ -5094,6 +5100,19 @@ fn chatgpt_codex_base_url_rejects_unsafe_values_from_every_source() {
 }
 
 #[test]
+fn provider_base_url_validation_preserves_provider_specific_serialization() {
+    let value = " https://proxy.example ";
+    assert_eq!(
+        validate_chatgpt_codex_base_url("test", value.into()).unwrap(),
+        "https://proxy.example/"
+    );
+    assert_eq!(
+        validate_upstream_base_url("test", value.into()).unwrap(),
+        "https://proxy.example"
+    );
+}
+
+#[test]
 fn chatgpt_codex_base_url_overrides_preserve_precedence_and_managed_policy() {
     let _env = crate::test_support::EnvScope::set(&[(
         "NEMO_RELAY_CHATGPT_CODEX_BASE_URL",
@@ -5159,4 +5178,101 @@ fn chatgpt_codex_base_url_overrides_preserve_precedence_and_managed_policy() {
         gateway.chatgpt_codex_base_url.as_deref(),
         Some("https://run.example/codex")
     );
+}
+
+#[test]
+fn provider_base_urls_are_validated_for_every_configuration_source() {
+    let _env = crate::test_support::EnvScope::set(&[
+        ("NEMO_RELAY_OPENAI_BASE_URL", None),
+        ("NEMO_RELAY_ANTHROPIC_BASE_URL", None),
+        ("NEMO_RELAY_CHATGPT_CODEX_BASE_URL", None),
+    ]);
+    for anthropic in [false, true] {
+        let env_name = if anthropic {
+            "NEMO_RELAY_ANTHROPIC_BASE_URL"
+        } else {
+            "NEMO_RELAY_OPENAI_BASE_URL"
+        };
+        for (value, allowed) in [
+            ("", false),
+            ("not a URL", false),
+            ("/relative", false),
+            ("ftp://localhost/v1", false),
+            ("http://api.anthropic.com", false),
+            ("http://172.16.0.223:30919", false),
+            ("https://user:password@provider.example/v1", false),
+            ("https://provider.example/v1?token=x", false),
+            ("https://provider.example/v1#fragment", false),
+            ("https://provider.example/v1", true),
+            ("https://172.16.0.223:30443", true),
+            ("http://localhost:8080", true),
+            ("http://127.0.0.1:8080/v1", true),
+            ("http://[::1]:8080", true),
+        ] {
+            let openai_base_url = (!anthropic).then(|| value.to_string());
+            let anthropic_base_url = anthropic.then(|| value.to_string());
+            let mut gateway = GatewayConfig::default();
+            let file_result = apply_file_upstream_config(
+                &mut gateway,
+                Some(FileUpstreamConfig {
+                    openai_base_url: openai_base_url.clone(),
+                    anthropic_base_url: anthropic_base_url.clone(),
+                    ..Default::default()
+                }),
+            );
+            assert_eq!(file_result.is_ok(), allowed, "file: {env_name} = {value:?}");
+            if value == "http://172.16.0.223:30919" {
+                assert!(
+                    file_result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("must use https unless the host is loopback")
+                );
+            }
+            assert_eq!(
+                apply_server_overrides(
+                    &mut gateway,
+                    &GatewayOverrides {
+                        openai_base_url: openai_base_url.clone(),
+                        anthropic_base_url: anthropic_base_url.clone(),
+                        ..Default::default()
+                    }
+                )
+                .is_ok(),
+                allowed,
+                "flag: {env_name} = {value:?}"
+            );
+            assert_eq!(
+                apply_run_url_overrides(
+                    &mut gateway,
+                    &RunOverrides {
+                        openai_base_url,
+                        anthropic_base_url,
+                        agent: None,
+                        config: None,
+                        chatgpt_codex_base_url: None,
+                        session_metadata: None,
+                        plugin_config_path: None,
+                        dry_run: true,
+                        print: false,
+                        command: vec![],
+                    }
+                )
+                .is_ok(),
+                allowed,
+                "run: {env_name} = {value:?}"
+            );
+            unsafe {
+                std::env::set_var(env_name, value);
+            }
+            assert_eq!(
+                apply_env_config(&mut gateway).is_ok(),
+                allowed,
+                "env: {env_name} = {value:?}"
+            );
+            unsafe {
+                std::env::remove_var(env_name);
+            }
+        }
+    }
 }
