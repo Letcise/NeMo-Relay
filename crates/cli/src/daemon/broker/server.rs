@@ -205,7 +205,23 @@ pub(crate) async fn serve(options: ServerOptions) -> Result<(), CliError> {
     }
     socket::recover_after_restart(Arc::clone(&state));
     spawn_maintenance(Arc::clone(&state));
-    let app = router(Arc::clone(&state));
+    let mut app = router(Arc::clone(&state));
+    if options.tls_cert.is_none() {
+        let tls = crate::gateway::tls::RelayTlsIdentity::load_or_create()
+            .and_then(|identity| identity.server_config())
+            .map_err(CliError::Launch)?;
+        let inner = app.clone();
+        let handshake_permits = Arc::new(Semaphore::new(MAX_CONCURRENT_TLS_HANDSHAKES));
+        app = app.route(
+            "/bootstrap/tunnel",
+            get(move |request: Request<Body>| {
+                let tls = Arc::clone(&tls);
+                let inner = inner.clone();
+                let handshake_permits = Arc::clone(&handshake_permits);
+                async move { crate::gateway::tls::upgrade(request, tls, inner, handshake_permits) }
+            }),
+        );
+    }
     let address = local.to_string();
     log::info!(
         target: "nemo_relay.daemon",
