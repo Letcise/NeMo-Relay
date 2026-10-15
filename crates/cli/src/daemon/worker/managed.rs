@@ -441,6 +441,7 @@ impl ManagedRuntime {
             .await
     }
 
+    /// Forward an undecoded request and observe its response for telemetry.
     async fn proxy_unbuffered(
         &self,
         upstream: PooledClient,
@@ -476,6 +477,7 @@ impl ManagedRuntime {
                     LlmCallParams::builder()
                         .name(&provider_name)
                         .request(&request_for_event)
+                        .codec(request_codec(surface))
                         .parent_opt(parent.as_ref())
                         .attributes(attributes)
                         .metadata(metadata.clone())
@@ -551,6 +553,7 @@ impl ManagedRuntime {
         Ok(response)
     }
 
+    /// Forward a decoded request after request middleware runs, then observe its response.
     async fn proxy_managed(
         &self,
         upstream: PooledClient,
@@ -606,6 +609,7 @@ impl ManagedRuntime {
                     LlmCallParams::builder()
                         .name(&provider_name)
                         .request(&request_for_event)
+                        .codec(codec)
                         .parent_opt(parent.as_ref())
                         .attributes(attributes)
                         .metadata(metadata.clone())
