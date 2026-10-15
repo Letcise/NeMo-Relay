@@ -428,8 +428,21 @@ changes the URL clears the lower header unless that same layer supplies a
 replacement, preventing credentials for one endpoint from being sent to
 another.
 
-An MCP-managed gateway uses custom or environment credentials only after the
-client proves that it belongs to that managed gateway.
+Foreground gateways and MCP-managed gateways require Relay authentication
+before they use provider credentials from their configuration or environment.
+Clients can authenticate with a Relay client token, a provider capability URL,
+or a credential from a managed invocation. A missing or invalid client token
+does not grant access to the gateway's provider credentials.
+This requirement also applies when Relay replaces a Codex ChatGPT credential.
+
+Without Relay authentication, requests use only provider credentials sent by
+the client. If the client sends no credentials, the upstream provider receives
+the request without credentials.
+
+For direct gateway use without Relay authentication, set the provider API key
+in the client. To use `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or a custom auth
+header from the gateway, the client must authenticate to Relay.
+Use `nemo-relay run` to let Relay set up client authentication.
 
 Relay handles Codex ChatGPT credentials differently from other provider credentials.
 On ordinary OpenAI paths, Relay treats either of these as a ChatGPT credential:
