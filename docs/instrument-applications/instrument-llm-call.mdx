@@ -242,7 +242,7 @@ Check both behavior and instrumentation:
   usage fields and a source matched the model.
 
 Native subscriber delivery is asynchronous. From an `asyncio` task, await
-`nemo_relay.subscribers.flush_async()`; in Node.js, await `flushSubscribers()`
+`nemo_relay.subscribers.flush_async()`. In Node.js, await `flushSubscribers()`
 and then one event-loop turn. Do this before validating printed output.
 
 - LLM start input contains the request after request intercepts and

@@ -231,7 +231,7 @@ Check both behavior and instrumentation:
 - The subscriber prints tool start and tool end events for `search`.
 
 Native subscriber delivery is asynchronous. From an `asyncio` task, await
-`nemo_relay.subscribers.flush_async()`; in Node.js, await `flushSubscribers()`
+`nemo_relay.subscribers.flush_async()`. In Node.js, await `flushSubscribers()`
 and then one event-loop turn. Do this before validating printed output.
 - Tool start input contains the request arguments after request intercepts and
   sanitize-request guardrails.
